@@ -1,0 +1,43 @@
+---
+title: "P8451_HW7_ML"
+author: "Ruixi Li"
+date: "2024-02-28"
+output: html_document
+---
+
+```{r libraries}
+library(tidyverse)
+
+
+
+```
+
+# Data preparation
+
+```{r load data, message=FALSE, warning=FALSE}
+# load the data, remove dupplicate and clean variable names
+mi = read_csv("mi.data.csv") |> distinct() |> janitor::clean_names()
+
+
+# mi |> group_by(fc) |> count()
+
+skimr::skim(mi) 
+
+mi = mi |> mutate(
+  sex = recode(sex,"0" = "Male", "1" = "Female", "2" = "Non-binary/Other"),
+  pulm_adema = recode(pulm_adema, "1" = "Yes", "0" = "No"),
+  fc = recode(fc, "0" = "there is no angina pectoris","1" = "I FC", "2" = "II FC", "3" = "III FC", "4"= "IV FC"),
+  arry = recode(arr, "1" = "Yes", "0" = "No"),
+  diab = recode(diab, "1" = "Yes", "0" = "No"),
+  obesity = recode(obesity, "1" = "Yes", "0" = "No"),
+  asthma = recode(asthma, "1" = "Yes", "0" = "No"),
+  readmission = recode(readmission, "1" = "Yes", "0" = "No"))
+
+mi |> Amelia::missmap(main = "Missing values vs observed")
+
+mi = mi |> mutate_if(is.character,as.factor)
+
+summary(mi$readmission)
+# the categorical outcome is slightly imbalanced
+```
+
