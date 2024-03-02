@@ -48,6 +48,8 @@ test.data = mi[-training.data, ]
 # Model training
 
 ```{r model_training, message=FALSE, warning=FALSE}
+set.seed(123)
+control<-trainControl(method="cv", number=10, sampling="down", classProbs = T)
 
 ```
 
