@@ -16,7 +16,7 @@ library(caret)
 
 ```{r load data, message=FALSE, warning=FALSE}
 # load the data, remove dupplicate and clean variable names
-mi = read_csv("mi.data.csv") |> distinct() |> janitor::clean_names()
+mi = read_csv("mi.data.csv") |> distinct() |> janitor::clean_names()|> select(-id)
 
 #mi |> group_by(fc) |> count()
 
@@ -36,20 +36,67 @@ summary(mi$readmission)
 # the categorical outcome is slightly imbalanced
 ```
 
-# Data Partitioning 
+# Data Partitioning and cross-validation
 
-```{r partition, message=FALSE, warning=FALSE}
+```{r partition_cv, message=FALSE, warning=FALSE}
 set.seed(123)
 training.data = mi$readmission |> createDataPartition(p=0.7, list=F)
 train.data = mi[training.data, ]
 test.data = mi[-training.data, ]
+
+set.seed(123)
+control<-trainControl(method="cv", number=10, sampling="down")
 ```
 
 # Model training
 
-```{r model_training, message=FALSE, warning=FALSE}
+```{r model_training_rf, message=FALSE, warning=FALSE}
 set.seed(123)
-control<-trainControl(method="cv", number=10, sampling="down", classProbs = T)
+
+# Define the tuning grid
+mtry <- expand.grid(.mtry=seq(2, ncol(train.data)-1, by = 1))
+
+# Setting mtry to the total number of features minus one is a fairly aggressive strategy, allowing each tree in the forest to consider almost all available features when making splits. This can be beneficial in certain datasets where most features contribute to predicting the target variable but can also increase the risk of overfitting, especially if some features are very predictive and consistently selected in the trees, leading to more correlated trees.So I chose to tuning thr mtry through cross validation
+
+# common ntree ranges from 100 to 1000, I tried 50, 100, 200, 300, ntree=100 produce the best performance, given other parameters constant.
+
+rf <-train(
+  readmission ~., 
+  data=train.data, 
+  method="rf", 
+  metric="Accuracy", 
+  tuneGrid=mtry, 
+  ntree=100, 
+  trControl=control)
+
+rf$results
+varImp(rf)
+plot(varImp(rf))
+confusionMatrix(rf)
 
 ```
 
+```{r model_training_en, message=FALSE, warning=FALSE}
+set.seed(123)
+en.model<- train(
+                  readmission ~., 
+                  data = train.data, 
+                  method = "glmnet",
+                  trControl =  control, 
+                  preProc=c("center", "scale"),
+                  tuneGrid = expand.grid(alpha = seq(0, 1, length = 21), 
+                                         lambda = exp(seq(3, -3, length = 100)))
+                )
+
+#Print the values of alpha and lambda that gave best prediction
+en.model$bestTune
+
+# Model coefficients
+coef(en.model$finalModel, en.model$bestTune$lambda)
+
+confusionMatrix(en.model)
+
+```
+
+* Model Comparison:
+While the Elastic Net model shows higher accuracy, it effectively ignores one class entirely. The Random Forest model, despite its lower accuracy, attempts to balance between classes, making it potentially more useful for applications requiring identification across both classes. 
