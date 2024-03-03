@@ -7,9 +7,9 @@ output: html_document
 
 ```{r libraries}
 library(tidyverse)
-library(dplyr)
 library(caret)
-
+library(pROC)
+library(rpart.plot)
 ```
 
 # Data preparation
@@ -45,7 +45,7 @@ train.data = mi[training.data, ]
 test.data = mi[-training.data, ]
 
 set.seed(123)
-control<-trainControl(method="cv", number=10, sampling="down")
+control = trainControl(method="cv", number=10, sampling="down")
 ```
 
 # Model training
@@ -54,13 +54,13 @@ control<-trainControl(method="cv", number=10, sampling="down")
 set.seed(123)
 
 # Define the tuning grid
-mtry <- expand.grid(.mtry=seq(2, ncol(train.data)-1, by = 1))
+mtry = expand.grid(.mtry=seq(2, ncol(train.data)-1, by = 1))
 
 # Setting mtry to the total number of features minus one is a fairly aggressive strategy, allowing each tree in the forest to consider almost all available features when making splits. This can be beneficial in certain datasets where most features contribute to predicting the target variable but can also increase the risk of overfitting, especially if some features are very predictive and consistently selected in the trees, leading to more correlated trees.So I chose to tuning thr mtry through cross validation
 
 # common ntree ranges from 100 to 1000, I tried 50, 100, 200, 300, ntree=100 produce the best performance, given other parameters constant.
 
-rf <-train(
+rf.model = train(
   readmission ~., 
   data=train.data, 
   method="rf", 
@@ -69,16 +69,16 @@ rf <-train(
   ntree=100, 
   trControl=control)
 
-rf$results
-varImp(rf)
-plot(varImp(rf))
-confusionMatrix(rf)
+rf.model$results
+varImp(rf.model)
+plot(varImp(rf.model))
+confusionMatrix(rf.model)
 
 ```
 
 ```{r model_training_en, message=FALSE, warning=FALSE}
 set.seed(123)
-en.model<- train(
+en.model = train(
                   readmission ~., 
                   data = train.data, 
                   method = "glmnet",
@@ -99,4 +99,54 @@ confusionMatrix(en.model)
 ```
 
 * Model Comparison:
-While the Elastic Net model shows higher accuracy, it effectively ignores one class entirely. The Random Forest model, despite its lower accuracy, attempts to balance between classes, making it potentially more useful for applications requiring identification across both classes. 
+While the Elastic Net model shows higher accuracy, the random forest model shows a more balanced approach in attempting to predict both classes, as evidenced by the non-zero TP and FN values. However, its overall accuracy drops to 64.05%, reflecting the trade-off between detecting more positive instances and making more errors (both FP and FN are higher). The sensitivity indicates it correctly identifies 44.68% of all actual positive instances, which is a significant improvement over the elastic net model. However, the precision is quite low at 11.8%, suggesting that many of the positive predictions are incorrect. The balanced accuracy improves slightly to 55.35%, indicating a more balanced but still limited performance across classes.
+
+# Model Evaluation
+
+```{r model_evaluation_rf, message=FALSE, warning=FALSE}
+
+#Create predictions in test set
+pred.rf = rf.model |>
+              predict(test.data)
+
+eval.results=confusionMatrix(pred.rf, test.data$readmission, positive = "1")
+print(eval.results)
+
+#Create predictions as probabilities on test set 
+pred.rf.prob = rf.model |> 
+  predict(test.data, type = "prob")
+
+```
+
+
+```{r model_evaluation_en, message=FALSE, warning=FALSE}
+#Create predictions in test set
+pred.en = en.model |>
+              predict(test.data)
+
+eval.results = confusionMatrix(pred.en, test.data$readmission, positive = "1")
+print(eval.results)
+
+#Create predictions as probabilities on test set 
+pred.en.prob = en.model |> 
+  predict(test.data, type = "prob")
+
+```
+
+
+```{r ROC}
+#Another potential evaluation: Area under the Receiver Operating Curve (AUROC)
+analysis_rf = roc(response=test.data$readmission, predictor=pred.rf.prob[,2])
+analysis_en = roc(response=test.data$readmission, predictor=pred.en.prob[,2])
+plot(1-analysis_rf$specificities,analysis_rf$sensitivities,type="l",
+ylab="Sensitivity",xlab="1-Specificity",col="red",lwd=2,
+main = "ROC Curve for the two models")
+lines(1-analysis_en$specificities, analysis_en$sensitivities, col="blue", lwd=2)
+abline(a=0,b=1)
+legend("bottom", legend=c("random forest", "elastic net"),
+       col=c("red", "blue"), lwd=2)
+auc_rf = auc(analysis_rf)
+auc_en = auc(analysis_en)
+```
+
+* As shown in ROC curve, the performance of the random forest model is better than that of the elastic net model. The AUC value also shows that: `r auc_rf`>`r auc_en`. But both of them shows a poor discriminative ability.
