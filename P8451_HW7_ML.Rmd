@@ -2,7 +2,7 @@
 title: "P8451_HW7_ML"
 author: "Ruixi Li"
 date: "2024-02-28"
-output: html_document
+output: word_document
 ---
 
 ```{r libraries}
@@ -29,6 +29,8 @@ mi = mi |> mutate(across(all_of(cate_var),as.factor))
 
 # set all categorical variables' reference group as '0'
 mi = mi |> mutate(across(all_of(cate_var), ~relevel(.x, ref = "0")))
+
+skimr::skim(mi)
 
 mi |> Amelia::missmap(main = "Missing values vs observed")
 
@@ -104,11 +106,12 @@ confusionMatrix(en.model)
 ```
 
 * Model Comparison:
-While the random forest model shows a higher accuracy(0.9001) compared to the Elastic Net model(0.6154), using the accuracy solely can be misleading on imbalanced datasets, even after upsampling, because it doesn't account for the distribution of the different classes; it simply reflects the proportion of total correct predictions.
+1. The random forest model shows a higher accuracy(0.9001) compared to the Elastic Net model(0.6154)， so I chose random forest model as my final model.
+
+2. While the random forest model shows a higher accuracy(0.9001) compared to the Elastic Net model(0.6154), using the accuracy solely can be misleading on imbalanced datasets, even after upsampling, because it doesn't account for the distribution of the different classes; it simply reflects the proportion of total correct predictions. I evaluated the both of the models using ROC curve and found that the Elastic Net model had a higher balanced accuracy, higher AUC value(0.6063 vs. 0.5351) and the ROC curve of it also at the left top corner compared with the random forest model's ROC curve. That is, the Elastic Net model offers a more balanced approach to handling both classes, making it the better choice in scenarios where both sensitivity and specificity are important. If we really want to develop a methods that can be implemented in the clinical setting. We would better choose Elastic Net model. But given that the professor said in the last lecture that we always compare and choose optimal model before applying it to test data,I just continued the following steps using random forest as my final model.
 
 
 # Model Evaluation
-Since the outcome is binary, I chose to use ROC curve to evaluate their performance. But the AUC value of the random forest is too low(0.55), which makes me doubt my choice of the model. So I did the prediction for both of the two models and compare them in ROC graphics. (Although the professor said in the last lecture that we always compare and choose optimal model before applying it to test data, it seems calculating ROC need the prediction values.) 
 
 ```{r model_evaluation_rf, message=FALSE, warning=FALSE}
 
@@ -128,15 +131,15 @@ pred.rf.prob = rf.model |>
 
 ```{r model_evaluation_en, message=FALSE, warning=FALSE}
 #Create predictions in test set
-pred.en = en.model |>
-              predict(test.data)
+#pred.en = en.model |>
+              #predict(test.data)
 
-eval.results = confusionMatrix(pred.en, test.data$readmission, positive = "1")
-print(eval.results)
+#eval.results = confusionMatrix(pred.en, test.data$readmission, positive = "1")
+#print(eval.results)
 
 #Create predictions as probabilities on test set 
-pred.en.prob = en.model |> 
-  predict(test.data, type = "prob")
+#pred.en.prob = en.model |> 
+  #predict(test.data, type = "prob")
 
 ```
 
@@ -144,18 +147,19 @@ pred.en.prob = en.model |>
 ```{r ROC}
 #Another potential evaluation: Area under the Receiver Operating Curve (AUROC)
 analysis_rf = roc(response=test.data$readmission, predictor=pred.rf.prob[,2])
-analysis_en = roc(response=test.data$readmission, predictor=pred.en.prob[,2])
+#analysis_en = roc(response=test.data$readmission, predictor=pred.en.prob[,2])
 plot(1-analysis_rf$specificities,analysis_rf$sensitivities,type="l",
 ylab="Sensitivity",xlab="1-Specificity",col="red",lwd=2,
-main = "ROC Curve for the two models")
-lines(1-analysis_en$specificities, analysis_en$sensitivities, col="blue", lwd=2)
+main = "ROC Curve for the random forest model")
+#lines(1-analysis_en$specificities, analysis_en$sensitivities, col="blue", lwd=2)
 abline(a=0,b=1)
-legend("bottom", legend=c("random forest", "elastic net"),
-       col=c("red", "blue"), lwd=2)
+#legend("bottom", legend=c("random forest", "elastic net"),
+       #col=c("red", "blue"), lwd=2)
 auc_rf = auc(analysis_rf)
 auc_rf
-auc_en = auc(analysis_en)
-auc_en
+#auc_en = auc(analysis_en)
+#auc_en
 ```
 
-* the Elastic Net model had a higher balanced accuracy, higher AUC value(0.6063 vs. 0.5351) and the ROC curve of it also at the left top corner compared with the random forest model's ROC curve. That is, the Elastic Net model offers a more balanced approach to handling both classes, making it the better choice in scenarios where both sensitivity and specificity are important. If we really want to develop a methods that can be implemented in the clinical setting. We would better choose Elastic Net model.
+* AUC value for the random forest model is low, suggesting a weak discriniative ability of it.
+
