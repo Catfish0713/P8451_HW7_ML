@@ -46,7 +46,7 @@ test.data = mi[-training.data, ]
 
 set.seed(123)
 control = trainControl(method="cv", number=10, sampling="up")
-# Although the professor said that we focus on proportion when deciding if we use over/uder sampling and focus on absolute sample size(159 positive here- which professor said  is not that small and I can use down sampling), I looked at your comments for last hw. For hw6, with 400+ "yes", I was advised to use upsampling. Maybe for this hw, I should also use upsampling. 
+# The professor said that we focus on proportion when deciding if we use over/uder sampling and focus on absolute sample size. I am not sure if there's golden rule for a "large/small" dataset, but for hw6, with 400+ "yes", I was advised to use upsampling. Maybe for this hw(150+ "yes"), I should also use upsampling. 
 #Plus, the computational load is acceptable when using upsampling. I chose to use up sampling here.
 ```
 
@@ -108,7 +108,7 @@ While the random forest model shows a higher accuracy(0.9001) compared to the El
 
 
 # Model Evaluation
-Since the outcome is binary, I chose to use ROC curve to evaluate their performance. But the AUC value is too low(0.55), which makes me doubt my choice of the model. So I did prediction for both of the two models and compare them in ROC graphics. (Although the professor said always compare and choose optimal model before applying it to test data, it seems calculating ROC need the prediction values.) 
+Since the outcome is binary, I chose to use ROC curve to evaluate their performance. But the AUC value of the random forest is too low(0.55), which makes me doubt my choice of the model. So I did the prediction for both of the two models and compare them in ROC graphics. (Although the professor said in the last lecture that we always compare and choose optimal model before applying it to test data, it seems calculating ROC need the prediction values.) 
 
 ```{r model_evaluation_rf, message=FALSE, warning=FALSE}
 
