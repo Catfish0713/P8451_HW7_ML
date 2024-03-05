@@ -33,7 +33,7 @@ mi = mi |> mutate(across(all_of(cate_var), ~relevel(.x, ref = "0")))
 mi |> Amelia::missmap(main = "Missing values vs observed")
 
 summary(mi$readmission)
-# the categorical outcome is slightly imbalanced
+# the categorical outcome is strongly imbalanced
 ```
 
 # Data Partitioning and cross-validation
@@ -45,7 +45,9 @@ train.data = mi[training.data, ]
 test.data = mi[-training.data, ]
 
 set.seed(123)
-control = trainControl(method="cv", number=10, sampling="down")
+control = trainControl(method="cv", number=10, sampling="up")
+# Although the professor said that we focus on proportion when deciding if we use over/uder sampling and focus on absolute sample size(159 positive here- which professor said  is not that small and I can use down sampling), I looked at your comments for last hw. For hw6, with 400+ "yes", I was advised to use upsampling. Maybe for this hw, I should also use upsampling. 
+#Plus, the computational load is acceptable when using upsampling. I chose to use up sampling here.
 ```
 
 # Model training
@@ -54,7 +56,7 @@ control = trainControl(method="cv", number=10, sampling="down")
 set.seed(123)
 
 # Define the tuning grid
-mtry = expand.grid(.mtry=seq(2, ncol(train.data)-1, by = 1))
+mtry = expand.grid(.mtry=seq(1, ncol(train.data), by = 1))
 
 # Setting mtry to the total number of features minus one is a fairly aggressive strategy, allowing each tree in the forest to consider almost all available features when making splits. This can be beneficial in certain datasets where most features contribute to predicting the target variable but can also increase the risk of overfitting, especially if some features are very predictive and consistently selected in the trees, leading to more correlated trees.So I chose to tuning thr mtry through cross validation
 
@@ -69,12 +71,15 @@ rf.model = train(
   ntree=100, 
   trControl=control)
 
-rf.model$results
+rf.model$bestTune
 varImp(rf.model)
 plot(varImp(rf.model))
 confusionMatrix(rf.model)
 
+
 ```
+
+
 
 ```{r model_training_en, message=FALSE, warning=FALSE}
 set.seed(123)
@@ -85,7 +90,7 @@ en.model = train(
                   trControl =  control, 
                   preProc=c("center", "scale"),
                   tuneGrid = expand.grid(alpha = seq(0, 1, length = 21), 
-                                         lambda = exp(seq(3, -3, length = 100)))
+                                         lambda = exp(seq(-3, 3, length = 100)))
                 )
 
 #Print the values of alpha and lambda that gave best prediction
@@ -99,9 +104,11 @@ confusionMatrix(en.model)
 ```
 
 * Model Comparison:
-While the Elastic Net model shows higher accuracy, the random forest model shows a more balanced approach in attempting to predict both classes, as evidenced by the non-zero TP and FN values. However, its overall accuracy drops to 64.05%, reflecting the trade-off between detecting more positive instances and making more errors (both FP and FN are higher). The sensitivity indicates it correctly identifies 44.68% of all actual positive instances, which is a significant improvement over the elastic net model. However, the precision is quite low at 11.8%, suggesting that many of the positive predictions are incorrect. The balanced accuracy improves slightly to 55.35%, indicating a more balanced but still limited performance across classes.
+While the random forest model shows a higher accuracy(0.9001) compared to the Elastic Net model(0.6154), using the accuracy solely can be misleading on imbalanced datasets, even after upsampling, because it doesn't account for the distribution of the different classes; it simply reflects the proportion of total correct predictions.
+
 
 # Model Evaluation
+Since the outcome is binary, I chose to use ROC curve to evaluate their performance. But the AUC value is too low(0.55), which makes me doubt my choice of the model. So I did prediction for both of the two models and compare them in ROC graphics. (Although the professor said always compare and choose optimal model before applying it to test data, it seems calculating ROC need the prediction values.) 
 
 ```{r model_evaluation_rf, message=FALSE, warning=FALSE}
 
@@ -146,7 +153,9 @@ abline(a=0,b=1)
 legend("bottom", legend=c("random forest", "elastic net"),
        col=c("red", "blue"), lwd=2)
 auc_rf = auc(analysis_rf)
+auc_rf
 auc_en = auc(analysis_en)
+auc_en
 ```
 
-* As shown in ROC curve, the performance of the random forest model is better than that of the elastic net model. The AUC value also shows that: `r auc_rf`>`r auc_en`. But both of them shows a poor discriminative ability.
+* the Elastic Net model had a higher balanced accuracy, higher AUC value(0.6063 vs. 0.5351) and the ROC curve of it also at the left top corner compared with the random forest model's ROC curve. That is, the Elastic Net model offers a more balanced approach to handling both classes, making it the better choice in scenarios where both sensitivity and specificity are important. If we really want to develop a methods that can be implemented in the clinical setting. We would better choose Elastic Net model.
